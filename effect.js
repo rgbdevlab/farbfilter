@@ -15,9 +15,9 @@
     const LIGHTNESS = 50;
     const HUE_SPREAD = 40;
 
-    // Tempo, mit dem der Kreis bei Bewegung in den Hintergrund zurückschmilzt,
-    // und die Ruhezeit, nach der er einfriert und wieder aufzutauchen beginnt.
-    const RESYNC_RATE = 0.5;
+    // Dauer, über die sich der Kreis bei Mausbewegung in den Hintergrund auflöst.
+    const DISSOLVE_MS = 1200;
+    // Ruhezeit, nach der er wieder einfriert und aufzutauchen beginnt.
     const STILL_MS = 400;
     // Restabstand zwischen shown und target, ab dem der Hintergrund als
     // ausgelaufen gilt. Muss über dem bleibenden Nachlauf liegen, den das
@@ -29,10 +29,17 @@
     // Stand des Kreises. Bleibt im Stillstand stehen, während shown weiterdriftet —
     // erst dadurch wird er überhaupt sichtbar.
     const orbState = { ...target };
-    // -Infinity: beim Laden liegt die letzte Bewegung unendlich lange zurück, der
-    // Kreis ist also sofort eingefroren und taucht auch ohne Mausbewegung auf.
+    // Stand, von dem aus die Auflösung startet, plus deren Fortschritt 0…1.
+    // Interpoliert wird zwischen diesem festen Ausgangspunkt und dem laufenden
+    // Hintergrund — anders als ein Nachziehen mit fester Rate kommt das
+    // garantiert bei null Abstand an, egal wie langsam es eingestellt ist.
+    const dissolveFrom = { ...target };
+    let dissolve = 1;
     let lastMove = -Infinity;
-    let frozen = false;
+    // Beim Laden sind beide Stände gleich: sofort eingefroren, der Kreis taucht
+    // also auch ohne jede Mausbewegung auf.
+    let frozen = true;
+    let lastFrame = performance.now();
     let inverted = false;
     let prevX = 0;
     let prevY = 0;
@@ -93,7 +100,17 @@
         prevY = y;
         target.hue = (x / window.innerWidth) * 360;
         lastMove = performance.now();
-        frozen = false;
+
+        // Nur der Übergang vom Stillstand startet eine neue Auflösung. Bei
+        // laufender Bewegung weiterlaufen lassen, sonst setzt jede Mausbewegung
+        // den Fortschritt zurück und der Kreis löst sich nie ganz auf.
+        if (frozen) {
+            dissolveFrom.hue = orbState.hue;
+            dissolveFrom.saturation = orbState.saturation;
+            dissolveFrom.angle = orbState.angle;
+            dissolve = 0;
+            frozen = false;
+        }
     };
 
     window.addEventListener('mousemove', e => updateFromCoords(e.clientX, e.clientY));
@@ -117,8 +134,13 @@
         });
     }
 
+    // Weich am Anfang und am Ende, damit das Auflösen weder ruckt noch abreißt.
+    const smoothstep = t => t * t * (3 - 2 * t);
+
     const animate = () => {
         const now = performance.now();
+        const dt = Math.min(now - lastFrame, 100);
+        lastFrame = now;
 
         target.hue = (target.hue + 0.05) % 360;
         target.saturation = 60 + Math.sin(now / 5000) * 10;
@@ -128,26 +150,26 @@
         shown.saturation = lerp(shown.saturation, target.saturation, 0.15);
         shown.angle = lerpAngle(shown.angle, target.angle, 0.1);
 
-        // Solange die Maus bewegt wird, schmilzt der Kreis in den Hintergrund
-        // zurück und verschwindet. Nach STILL_MS Ruhe wird er exakt auf den
-        // Hintergrund gesetzt und friert ein — ab da driftet nur noch der
-        // Hintergrund, und der Kreis schält sich von null an wieder heraus.
-        // Nicht nur die Maus muss stehen — der Hintergrund muss die letzte
-        // Mausposition auch eingeholt haben. Friert der Kreis vorher ein, läuft
-        // ihm der Hintergrund sofort davon und er springt sichtbar auf.
-        const ausgelaufen = Math.abs(angleDelta(shown.hue, target.hue)) < SETTLED_DEG
-            && Math.abs(angleDelta(shown.angle, target.angle)) < SETTLED_DEG;
-        const stillstand = now - lastMove > STILL_MS && ausgelaufen;
+        if (!frozen) {
+            // Der Kreis löst sich über DISSOLVE_MS in den Hintergrund auf. Bei
+            // dissolve = 1 ist er deckungsgleich und bleibt daran kleben, solange
+            // die Maus in Bewegung ist.
+            dissolve = Math.min(1, dissolve + dt / DISSOLVE_MS);
+            const t = smoothstep(dissolve);
+            orbState.hue = lerpAngle(dissolveFrom.hue, shown.hue, t);
+            orbState.saturation = lerp(dissolveFrom.saturation, shown.saturation, t);
+            orbState.angle = lerpAngle(dissolveFrom.angle, shown.angle, t);
 
-        if (!stillstand) {
-            orbState.hue = lerpAngle(orbState.hue, shown.hue, RESYNC_RATE);
-            orbState.saturation = lerp(orbState.saturation, shown.saturation, RESYNC_RATE);
-            orbState.angle = lerpAngle(orbState.angle, shown.angle, RESYNC_RATE);
-        } else if (!frozen) {
-            orbState.hue = shown.hue;
-            orbState.saturation = shown.saturation;
-            orbState.angle = shown.angle;
-            frozen = true;
+            // Einfrieren erst, wenn die Auflösung durch ist, die Maus steht UND
+            // der Hintergrund die letzte Mausposition eingeholt hat. Friert er
+            // vorher ein, läuft ihm der Hintergrund davon und er springt auf,
+            // statt von null an aufzutauchen.
+            const ausgelaufen = Math.abs(angleDelta(shown.hue, target.hue)) < SETTLED_DEG
+                && Math.abs(angleDelta(shown.angle, target.angle)) < SETTLED_DEG;
+
+            if (dissolve === 1 && now - lastMove > STILL_MS && ausgelaufen) {
+                frozen = true;
+            }
         }
 
         render();
