@@ -19,6 +19,27 @@
     const DISSOLVE_MS = 1200;
     // Ruhezeit, nach der er wieder einfriert und aufzutauchen beginnt.
     const STILL_MS = 400;
+    // Gegenlauf des Kreis-Verlaufs im Stillstand, in Grad pro Sekunde. Der
+    // Hintergrund dreht mit rund +6 °/s, der Kreis also gegenläufig — die
+    // sichtbare Relativdrehung ist die Summe aus beidem.
+    const SPIN_DEG_PER_S = 18;
+    // Farbspanne des Kreis-Verlaufs, wenn er voll da ist. Deutlich weiter als die
+    // des Hintergrunds, weil der Kreis nur rund ein Drittel der Bildschirmachse
+    // abdeckt und von einer schmalen Spanne kaum etwas abbekommt. Außerhalb des
+    // Kreises fällt das nicht auf, dort ist die Ebene beschnitten. Beim Auflösen
+    // fährt der Wert auf HUE_SPREAD zurück — sonst bliebe der Kreis sichtbar.
+    const ORB_HUE_SPREAD = 300;
+    // Glühen am Kreisrand, zweistufig: ein enger heller Saum direkt an der Kante
+    // und ein weiter, weicher Schein darum. Die Weichzeichnung ist ein Anteil der
+    // kürzeren Bildschirmkante. Beide Stufen fahren mit presence herunter, sonst
+    // bliebe beim Auflösen ein Ring stehen. Hell genug, dass es sich vom
+    // Hintergrund abhebt — der hat oft fast denselben Farbton.
+    const GLOW_TIGHT = 0.012;
+    const GLOW_WIDE = 0.09;
+    const GLOW_LIGHTNESS = 88;
+    // Zeit, über die sich Farbspanne und Glühen im Stillstand aufbauen. Passt
+    // grob dazu, wie schnell der Farbton der Kugel vom Hintergrund wegläuft.
+    const EMERGE_MS = 5000;
     // Restabstand zwischen shown und target, ab dem der Hintergrund als
     // ausgelaufen gilt. Muss über dem bleibenden Nachlauf liegen, den das
     // Lerp gegenüber der stetigen Drift behält (rund 0,3° bzw. 0,9°).
@@ -35,6 +56,13 @@
     // weg, der Kreis bleibt stehen — und blitzt kurz auf, statt zu verblassen.
     const orbOffset = { hue: 0, saturation: 0, angle: 0 };
     let dissolve = 1;
+    // 1 = voll da, 0 = im Hintergrund aufgegangen. Steuert Farbspanne und Glühen.
+    // Muss beim Einfrieren bei 0 anfangen und hochlaufen: die Kugel schält sich
+    // dort erst allmählich heraus, ein sofort volles Glühen wäre ein leuchtender
+    // Ring um nichts. presenceStart hält den Wert fest, bei dem eine Auflösung
+    // begonnen hat, damit sie von dort aus fällt statt auf 1 zu springen.
+    let presence = 0;
+    let presenceStart = 0;
     let lastMove = -Infinity;
     // Beim Laden sind beide Stände gleich: sofort eingefroren, der Kreis taucht
     // also auch ohne jede Mausbewegung auf.
@@ -44,9 +72,17 @@
     let prevX = 0;
     let prevY = 0;
 
+    // Gepuffert statt pro Bild gelesen — window.innerWidth zwingt den Browser
+    // sonst jedes Mal zum Nachrechnen des Layouts.
+    let kurzeKante = Math.min(window.innerWidth, window.innerHeight);
+    window.addEventListener('resize', () => {
+        kurzeKante = Math.min(window.innerWidth, window.innerHeight);
+    });
+
     const root = document.documentElement;
     const canvas = document.getElementById('dynamic-bg') || document.body;
     const orb = document.getElementById('orb');
+    const orbGlow = document.getElementById('orb-glow');
     const themeMeta = document.getElementById('theme-meta');
 
     const hslToHex = (h, s, l) => {
@@ -60,9 +96,9 @@
         return `#${f(0)}${f(8)}${f(4)}`;
     };
 
-    const gradientOf = s => {
+    const gradientOf = (s, spread = HUE_SPREAD) => {
         const c1 = `hsl(${s.hue}, ${s.saturation}%, ${LIGHTNESS}%)`;
-        const c2 = `hsl(${(s.hue + HUE_SPREAD) % 360}, ${s.saturation}%, ${LIGHTNESS}%)`;
+        const c2 = `hsl(${(s.hue + spread) % 360}, ${s.saturation}%, ${LIGHTNESS}%)`;
         return `linear-gradient(${s.angle}deg, ${c1}, ${c2})`;
     };
 
@@ -74,7 +110,21 @@
         root.classList.toggle('inverted', inverted);
 
         if (orb) {
-            orb.style.background = gradientOf(orbState);
+            orb.style.background = gradientOf(orbState, lerp(HUE_SPREAD, ORB_HUE_SPREAD, presence));
+
+            // Unter 1 % Sichtbarkeit ganz abschalten: ein filter erzwingt eine
+            // eigene Ebene samt Weichzeichnung pro Bild, auch wenn man nichts sieht.
+            if (orbGlow) {
+                if (presence > 0.01) {
+                    const farbe = a =>
+                        `hsla(${orbState.hue}, 100%, ${GLOW_LIGHTNESS}%, ${(a * presence).toFixed(3)})`;
+                    orbGlow.style.filter =
+                        `drop-shadow(0 0 ${Math.round(kurzeKante * GLOW_TIGHT)}px ${farbe(0.95)}) `
+                        + `drop-shadow(0 0 ${Math.round(kurzeKante * GLOW_WIDE)}px ${farbe(0.6)})`;
+                } else if (orbGlow.style.filter !== 'none') {
+                    orbGlow.style.filter = 'none';
+                }
+            }
         }
 
         if (themeMeta) {
@@ -109,6 +159,7 @@
             orbOffset.saturation = orbState.saturation - shown.saturation;
             orbOffset.angle = angleDelta(shown.angle, orbState.angle);
             dissolve = 0;
+            presenceStart = presence;
             frozen = false;
         }
     };
@@ -159,6 +210,7 @@
             // schrumpfenden Rest des ursprünglichen Abstands. Springt der
             // Hintergrund, springt er mit — kein Aufblitzen.
             const rest = 1 - smoothstep(dissolve);
+            presence = presenceStart * rest;
             orbState.hue = (shown.hue + orbOffset.hue * rest + 360) % 360;
             orbState.saturation = shown.saturation + orbOffset.saturation * rest;
             orbState.angle = (shown.angle + orbOffset.angle * rest + 360) % 360;
@@ -173,6 +225,14 @@
             if (dissolve === 1 && now - lastMove > STILL_MS && ausgelaufen) {
                 frozen = true;
             }
+        } else {
+            // Im Stillstand steht der Farbton des Kreises still, während der
+            // Hintergrund weiterwandert — daher wird er überhaupt sichtbar.
+            // Sein Verlaufswinkel dreht zusätzlich gegen den Hintergrund: die
+            // Kante zwischen den beiden Tönen wandert durch den Kreis und lässt
+            // ihn wie eine sich drehende Kugel wirken.
+            orbState.angle = (orbState.angle - SPIN_DEG_PER_S * dt / 1000 + 360) % 360;
+            presence = Math.min(1, presence + dt / EMERGE_MS);
         }
 
         render();

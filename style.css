@@ -48,13 +48,22 @@ body {
    beschnitten wird — nicht ein kleines Element mit eigenem Verlauf. Nur so ist
    die Füllung deckungsgleich mit dem Hintergrund und damit unsichtbar, solange
    beide denselben Stand zeigen. Den Rest macht effect.js: bei Mausbewegung wird
-   die Ebene nachgezogen, im Stillstand driftet nur der Hintergrund weiter. */
-.orb {
+   die Ebene nachgezogen, im Stillstand driftet nur der Hintergrund weiter.
+
+   Zwei Ebenen, weil filter und clip-path auf demselben Element in der falschen
+   Reihenfolge greifen: der Schatten würde vom unbeschnittenen Rechteck gebildet
+   und anschließend mit weggeschnitten. Außen glühen, innen beschneiden. */
+.orb-glow {
     position: fixed;
     inset: 0;
     z-index: -1;
-    clip-path: circle(32vmin at 50% 50%);
     pointer-events: none;
+}
+
+.orb {
+    position: absolute;
+    inset: 0;
+    clip-path: circle(32vmin at 50% 50%);
 }
 
 /* Ecken-UI — so leise wie möglich, liegt per difference auf dem Verlauf.
