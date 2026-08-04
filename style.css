@@ -41,7 +41,20 @@ body {
 .bg-layer {
     position: fixed;
     inset: 0;
+    z-index: -2;
+}
+
+/* Der Kreis ist eine zweite, bildschirmfüllende Verlaufsebene, die zum Kreis
+   beschnitten wird — nicht ein kleines Element mit eigenem Verlauf. Nur so ist
+   die Füllung deckungsgleich mit dem Hintergrund und damit unsichtbar, solange
+   beide denselben Stand zeigen. Den Rest macht effect.js: bei Mausbewegung wird
+   die Ebene nachgezogen, im Stillstand driftet nur der Hintergrund weiter. */
+.orb {
+    position: fixed;
+    inset: 0;
     z-index: -1;
+    clip-path: circle(22vmin at 50% 50%);
+    pointer-events: none;
 }
 
 /* Ecken-UI — so leise wie möglich, liegt per difference auf dem Verlauf.
