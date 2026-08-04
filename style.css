@@ -53,7 +53,7 @@ body {
     position: fixed;
     inset: 0;
     z-index: -1;
-    clip-path: circle(22vmin at 50% 50%);
+    clip-path: circle(32vmin at 50% 50%);
     pointer-events: none;
 }
 

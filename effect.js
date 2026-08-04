@@ -29,11 +29,11 @@
     // Stand des Kreises. Bleibt im Stillstand stehen, während shown weiterdriftet —
     // erst dadurch wird er überhaupt sichtbar.
     const orbState = { ...target };
-    // Stand, von dem aus die Auflösung startet, plus deren Fortschritt 0…1.
-    // Interpoliert wird zwischen diesem festen Ausgangspunkt und dem laufenden
-    // Hintergrund — anders als ein Nachziehen mit fester Rate kommt das
-    // garantiert bei null Abstand an, egal wie langsam es eingestellt ist.
-    const dissolveFrom = { ...target };
+    // Abstand des Kreises zum Hintergrund beim Start der Auflösung, plus deren
+    // Fortschritt 0…1. Festgehalten wird bewusst der Abstand und nicht der
+    // absolute Stand: sonst springt der Hintergrund bei einer Richtungsänderung
+    // weg, der Kreis bleibt stehen — und blitzt kurz auf, statt zu verblassen.
+    const orbOffset = { hue: 0, saturation: 0, angle: 0 };
     let dissolve = 1;
     let lastMove = -Infinity;
     // Beim Laden sind beide Stände gleich: sofort eingefroren, der Kreis taucht
@@ -105,9 +105,9 @@
         // laufender Bewegung weiterlaufen lassen, sonst setzt jede Mausbewegung
         // den Fortschritt zurück und der Kreis löst sich nie ganz auf.
         if (frozen) {
-            dissolveFrom.hue = orbState.hue;
-            dissolveFrom.saturation = orbState.saturation;
-            dissolveFrom.angle = orbState.angle;
+            orbOffset.hue = angleDelta(shown.hue, orbState.hue);
+            orbOffset.saturation = orbState.saturation - shown.saturation;
+            orbOffset.angle = angleDelta(shown.angle, orbState.angle);
             dissolve = 0;
             frozen = false;
         }
@@ -155,10 +155,13 @@
             // dissolve = 1 ist er deckungsgleich und bleibt daran kleben, solange
             // die Maus in Bewegung ist.
             dissolve = Math.min(1, dissolve + dt / DISSOLVE_MS);
-            const t = smoothstep(dissolve);
-            orbState.hue = lerpAngle(dissolveFrom.hue, shown.hue, t);
-            orbState.saturation = lerp(dissolveFrom.saturation, shown.saturation, t);
-            orbState.angle = lerpAngle(dissolveFrom.angle, shown.angle, t);
+            // Der Kreis hängt am Hintergrund und behält nur noch einen
+            // schrumpfenden Rest des ursprünglichen Abstands. Springt der
+            // Hintergrund, springt er mit — kein Aufblitzen.
+            const rest = 1 - smoothstep(dissolve);
+            orbState.hue = (shown.hue + orbOffset.hue * rest + 360) % 360;
+            orbState.saturation = shown.saturation + orbOffset.saturation * rest;
+            orbState.angle = (shown.angle + orbOffset.angle * rest + 360) % 360;
 
             // Einfrieren erst, wenn die Auflösung durch ist, die Maus steht UND
             // der Hintergrund die letzte Mausposition eingeholt hat. Friert er
