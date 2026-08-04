@@ -12,8 +12,24 @@
 (() => {
     'use strict';
 
-    const LIGHTNESS = 50;
+    const LIGHTNESS = 56;
     const HUE_SPREAD = 40;
+
+    // Zwischenstufen im Verlauf. Ohne sie interpoliert CSS zwischen den beiden
+    // Endfarben quer durch den Farbraum und laeuft bei weiten Spannen durch ein
+    // graues, dunkel wirkendes Mittelfeld. Mit gesetzten Stufen wandert der
+    // Farbton und die Helligkeit bleibt erhalten.
+    const STOPS = 7;
+    // Zusaetzliche Aufhellung zur Mitte des Kugel-Verlaufs, damit sie nach innen
+    // leuchtet statt abzusacken. Faehrt mit presence herunter.
+    const ORB_LIFT = 12;
+
+    // Drift und Nachlauf in Grad pro Sekunde bzw. Millisekunden — nicht pro Bild.
+    // Pro Bild gerechnet liefe auf einem 120-Hz-Schirm alles doppelt so schnell.
+    const HUE_DRIFT = 1.5;
+    const ANGLE_DRIFT = 3;
+    const FOLLOW_MS = 110;
+    const ANGLE_FOLLOW_MS = 170;
 
     // Dauer, über die sich der Kreis bei Mausbewegung in den Hintergrund auflöst.
     const DISSOLVE_MS = 1200;
@@ -22,7 +38,7 @@
     // Gegenlauf des Kreis-Verlaufs im Stillstand, in Grad pro Sekunde. Der
     // Hintergrund dreht mit rund +6 °/s, der Kreis also gegenläufig — die
     // sichtbare Relativdrehung ist die Summe aus beidem.
-    const SPIN_DEG_PER_S = 18;
+    const SPIN_DEG_PER_S = 9;
     // Farbspanne des Kreis-Verlaufs, wenn er voll da ist. Deutlich weiter als die
     // des Hintergrunds, weil der Kreis nur rund ein Drittel der Bildschirmachse
     // abdeckt und von einer schmalen Spanne kaum etwas abbekommt. Außerhalb des
@@ -34,9 +50,11 @@
     // kürzeren Bildschirmkante. Beide Stufen fahren mit presence herunter, sonst
     // bliebe beim Auflösen ein Ring stehen. Hell genug, dass es sich vom
     // Hintergrund abhebt — der hat oft fast denselben Farbton.
-    const GLOW_TIGHT = 0.012;
-    const GLOW_WIDE = 0.09;
-    const GLOW_LIGHTNESS = 88;
+    const GLOW_TIGHT = 0.010;
+    const GLOW_WIDE = 0.07;
+    const GLOW_LIGHTNESS = 90;
+    const GLOW_ALPHA_TIGHT = 0.34;
+    const GLOW_ALPHA_WIDE = 0.20;
     // Zeit, über die sich Farbspanne und Glühen im Stillstand aufbauen. Passt
     // grob dazu, wie schnell der Farbton der Kugel vom Hintergrund wegläuft.
     const EMERGE_MS = 5000;
@@ -96,10 +114,16 @@
         return `#${f(0)}${f(8)}${f(4)}`;
     };
 
-    const gradientOf = (s, spread = HUE_SPREAD) => {
-        const c1 = `hsl(${s.hue}, ${s.saturation}%, ${LIGHTNESS}%)`;
-        const c2 = `hsl(${(s.hue + spread) % 360}, ${s.saturation}%, ${LIGHTNESS}%)`;
-        return `linear-gradient(${s.angle}deg, ${c1}, ${c2})`;
+    const gradientOf = (s, spread = HUE_SPREAD, lift = 0) => {
+        const stops = [];
+        for (let i = 0; i < STOPS; i++) {
+            const f = i / (STOPS - 1);
+            // Aufhellung in der Mitte, an beiden Enden null — so bleibt der
+            // Anschluss an den Hintergrund nahtlos.
+            const l = LIGHTNESS + lift * Math.sin(Math.PI * f);
+            stops.push(`hsl(${(s.hue + spread * f) % 360}, ${s.saturation}%, ${l}%)`);
+        }
+        return `linear-gradient(${s.angle}deg, ${stops.join(', ')})`;
     };
 
     // Ein einziger Schreibvorgang pro Frame — nicht einer pro geänderter Eigenschaft.
@@ -110,7 +134,11 @@
         root.classList.toggle('inverted', inverted);
 
         if (orb) {
-            orb.style.background = gradientOf(orbState, lerp(HUE_SPREAD, ORB_HUE_SPREAD, presence));
+            orb.style.background = gradientOf(
+                orbState,
+                lerp(HUE_SPREAD, ORB_HUE_SPREAD, presence),
+                ORB_LIFT * presence
+            );
 
             // Unter 1 % Sichtbarkeit ganz abschalten: ein filter erzwingt eine
             // eigene Ebene samt Weichzeichnung pro Bild, auch wenn man nichts sieht.
@@ -119,8 +147,8 @@
                     const farbe = a =>
                         `hsla(${orbState.hue}, 100%, ${GLOW_LIGHTNESS}%, ${(a * presence).toFixed(3)})`;
                     orbGlow.style.filter =
-                        `drop-shadow(0 0 ${Math.round(kurzeKante * GLOW_TIGHT)}px ${farbe(0.95)}) `
-                        + `drop-shadow(0 0 ${Math.round(kurzeKante * GLOW_WIDE)}px ${farbe(0.6)})`;
+                        `drop-shadow(0 0 ${Math.round(kurzeKante * GLOW_TIGHT)}px ${farbe(GLOW_ALPHA_TIGHT)}) `
+                        + `drop-shadow(0 0 ${Math.round(kurzeKante * GLOW_WIDE)}px ${farbe(GLOW_ALPHA_WIDE)})`;
                 } else if (orbGlow.style.filter !== 'none') {
                     orbGlow.style.filter = 'none';
                 }
@@ -193,13 +221,18 @@
         const dt = Math.min(now - lastFrame, 100);
         lastFrame = now;
 
-        target.hue = (target.hue + 0.05) % 360;
+        target.hue = (target.hue + HUE_DRIFT * dt / 1000) % 360;
         target.saturation = 60 + Math.sin(now / 5000) * 10;
-        target.angle = (target.angle + 0.1) % 360;
+        target.angle = (target.angle + ANGLE_DRIFT * dt / 1000) % 360;
 
-        shown.hue = lerpAngle(shown.hue, target.hue, 0.15);
-        shown.saturation = lerp(shown.saturation, target.saturation, 0.15);
-        shown.angle = lerpAngle(shown.angle, target.angle, 0.1);
+        // Bildratenunabhängiges Nachlaufen: nach FOLLOW_MS ist rund zwei Drittel
+        // des Abstands abgebaut, egal ob der Schirm mit 60 oder 120 Hz läuft.
+        const folgen = 1 - Math.exp(-dt / FOLLOW_MS);
+        const folgenWinkel = 1 - Math.exp(-dt / ANGLE_FOLLOW_MS);
+
+        shown.hue = lerpAngle(shown.hue, target.hue, folgen);
+        shown.saturation = lerp(shown.saturation, target.saturation, folgen);
+        shown.angle = lerpAngle(shown.angle, target.angle, folgenWinkel);
 
         if (!frozen) {
             // Der Kreis löst sich über DISSOLVE_MS in den Hintergrund auf. Bei
