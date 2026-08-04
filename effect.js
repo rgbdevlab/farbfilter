@@ -34,7 +34,10 @@
     // Dauer, über die sich der Kreis bei Mausbewegung in den Hintergrund auflöst.
     const DISSOLVE_MS = 1200;
     // Ruhezeit, nach der er wieder einfriert und aufzutauchen beginnt.
-    const STILL_MS = 400;
+    const STILL_MS = 1400;
+    // Reihenfolge der Formen. Wird bei jedem neuen Auftauchen weitergeschaltet,
+    // beim Laden steht sie auf dem Kreis.
+    const SHAPES = ['orb--circle', 'orb--triangle', 'orb--square'];
     // Gegenlauf des Kreis-Verlaufs im Stillstand, in Grad pro Sekunde. Der
     // Hintergrund dreht mit rund +6 °/s, der Kreis also gegenläufig — die
     // sichtbare Relativdrehung ist die Summe aus beidem.
@@ -81,6 +84,7 @@
     // begonnen hat, damit sie von dort aus fällt statt auf 1 zu springen.
     let presence = 0;
     let presenceStart = 0;
+    let shapeIndex = 0;
     let lastMove = -Infinity;
     // Beim Laden sind beide Stände gleich: sofort eingefroren, der Kreis taucht
     // also auch ohne jede Mausbewegung auf.
@@ -257,6 +261,12 @@
 
             if (dissolve === 1 && now - lastMove > STILL_MS && ausgelaufen) {
                 frozen = true;
+                // Nächste Form. Hier ist die Fläche noch deckungsgleich mit dem
+                // Hintergrund, der Wechsel fällt also nicht auf.
+                if (orb) {
+                    shapeIndex = (shapeIndex + 1) % SHAPES.length;
+                    orb.className = `orb ${SHAPES[shapeIndex]}`;
+                }
             }
         } else {
             // Im Stillstand steht der Farbton des Kreises still, während der

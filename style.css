@@ -63,7 +63,28 @@ body {
 .orb {
     position: absolute;
     inset: 0;
+}
+
+/* Die Form wechselt bei jedem neuen Auftauchen. Umgeschaltet wird im Moment des
+   Einfrierens, wo die Fläche noch deckungsgleich mit dem Hintergrund ist — der
+   Wechsel selbst ist dadurch unsichtbar. Die Maße sind so gewählt, dass die drei
+   Formen optisch gleich groß wirken: das Dreieck braucht mehr Umkreisradius,
+   weil es davon nur einen Teil ausfüllt. */
+.orb--circle {
     clip-path: circle(32vmin at 50% 50%);
+}
+
+.orb--triangle {
+    clip-path: polygon(50% calc(50% - 38vmin),
+            calc(50% + 32.9vmin) calc(50% + 19vmin),
+            calc(50% - 32.9vmin) calc(50% + 19vmin));
+}
+
+.orb--square {
+    clip-path: polygon(calc(50% - 27vmin) calc(50% - 27vmin),
+            calc(50% + 27vmin) calc(50% - 27vmin),
+            calc(50% + 27vmin) calc(50% + 27vmin),
+            calc(50% - 27vmin) calc(50% + 27vmin));
 }
 
 /* Ecken-UI — so leise wie möglich, liegt per difference auf dem Verlauf.
