@@ -60,7 +60,7 @@
     const GLOW_ALPHA_WIDE = 0.20;
     // Zeit, über die sich Farbspanne und Glühen im Stillstand aufbauen. Passt
     // grob dazu, wie schnell der Farbton der Kugel vom Hintergrund wegläuft.
-    const EMERGE_MS = 5000;
+    const EMERGE_MS = 9000;
     // Restabstand zwischen shown und target, ab dem der Hintergrund als
     // ausgelaufen gilt. Muss über dem bleibenden Nachlauf liegen, den das
     // Lerp gegenüber der stetigen Drift behält (rund 0,3° bzw. 0,9°).
