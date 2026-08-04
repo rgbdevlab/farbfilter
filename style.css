@@ -1,0 +1,131 @@
+/* farbfilter — gemeinsames Stylesheet für alle Seiten */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    height: 100dvh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #000;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* pan-y, nicht none: sonst lässt sich der Rechtstext auf dem Handy nicht scrollen.
+       Gegen das iOS-Gummiband reicht overscroll-behavior am html-Element. */
+    touch-action: pan-y;
+    transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.inverted {
+    filter: invert(1);
+}
+
+/* Der Verlauf liegt auf einer eigenen Ebene hinter dem Inhalt, nicht auf dem body.
+   Sonst blendet mix-blend-difference gegen einen Hintergrund, der sich im selben
+   Frame ändert — die geblendete Box zeichnet sich dann als Rechteck ab. */
+.bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+}
+
+/* Ecken-UI — so leise wie möglich, liegt per difference auf dem Verlauf.
+   translateZ(0) stabilisiert position:fixed unter dem filter des Elternteils (Safari). */
+.corner {
+    position: fixed;
+    z-index: 50;
+    transform: translateZ(0);
+    -webkit-tap-highlight-color: transparent;
+    mix-blend-mode: difference;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 300;
+    line-height: 1.6;
+    user-select: none;
+}
+
+.corner a {
+    color: inherit;
+    text-decoration: none;
+    transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.corner a:hover {
+    opacity: 0.6;
+}
+
+.corner--bl {
+    bottom: 2rem;
+    left: 2rem;
+}
+
+.corner--br {
+    bottom: 2rem;
+    right: 2rem;
+    text-align: right;
+}
+
+/* Fließtext (nur Datenschutz) — Scrollbalken bleibt verborgen */
+.legal {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 34rem;
+    max-height: 70dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 2rem;
+    mix-blend-mode: difference;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 300;
+    line-height: 1.7;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.legal::-webkit-scrollbar {
+    display: none;
+}
+
+.legal h1,
+.legal h2 {
+    font-size: 0.7rem;
+    font-weight: 400;
+}
+
+.legal h1 {
+    margin: 0 0 1.5rem;
+}
+
+.legal h2 {
+    margin: 1.5rem 0 0.25rem;
+}
+
+.legal p {
+    margin: 0 0 0.75rem;
+}
+
+.legal a {
+    color: inherit;
+}
+
+.legal .stand {
+    margin-top: 2rem;
+    opacity: 0.6;
+}

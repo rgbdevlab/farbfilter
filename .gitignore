@@ -1,0 +1,6 @@
+.DS_Store
+
+# Galerie — wird neu gebaut. Dateien bleiben lokal liegen, gehoeren aber
+# nicht mehr zur Seite und nicht ins oeffentliche Repo.
+images/
+grid.html
