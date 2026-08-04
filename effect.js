@@ -35,9 +35,10 @@
     const DISSOLVE_MS = 1200;
     // Ruhezeit, nach der er wieder einfriert und aufzutauchen beginnt.
     const STILL_MS = 1400;
-    // Reihenfolge der Formen. Wird bei jedem neuen Auftauchen weitergeschaltet,
-    // beim Laden steht sie auf dem Kreis.
-    const SHAPES = ['orb--circle', 'orb--triangle', 'orb--square'];
+    // Reihenfolge der Formen. Wird bei jedem neuen Auftauchen weitergeschaltet.
+    // Vorerst nur der Kreis — 'orb--triangle' und 'orb--square' stehen fertig in
+    // style.css und müssen zum Reaktivieren nur wieder hier eingetragen werden.
+    const SHAPES = ['orb--circle'];
     // Gegenlauf des Kreis-Verlaufs im Stillstand, in Grad pro Sekunde. Der
     // Hintergrund dreht mit rund +6 °/s, der Kreis also gegenläufig — die
     // sichtbare Relativdrehung ist die Summe aus beidem.
