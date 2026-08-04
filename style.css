@@ -129,3 +129,9 @@ body {
     margin-top: 2rem;
     opacity: 0.6;
 }
+
+/* Abstand zur zweiten Sprachfassung */
+.legal .second-language {
+    display: block;
+    margin-top: 3rem;
+}
